@@ -106,8 +106,8 @@ input[type=range]{width:100%; accent-color:var(--accent); min-height:24px; margi
 #again.on{background:var(--chip-on); color:var(--chip-on-fg); border-color:transparent}
 .toprow .btn{min-height:44px; padding:8px 12px; font-size:14px; white-space:nowrap}
 .mlabel{font-size:12px; letter-spacing:.08em; color:var(--muted); font-weight:700}
-#bubbleMode,#treatMode{gap:6px; flex-wrap:nowrap}
-#treatMode .chip{padding:5px 11px; min-height:34px; font-size:13px; white-space:nowrap}
+#bubbleMode,#treatMode,#popMode{gap:6px; flex-wrap:nowrap}
+#treatMode .chip{padding:5px 9px; min-height:34px; font-size:13px; white-space:nowrap}
 #bubbleMode .chip{padding:5px 11px; min-height:34px; font-size:13px; white-space:nowrap}
 .subrow{display:flex; align-items:center; justify-content:space-between; gap:8px 10px; margin-top:6px}
 .subrow .lead{margin:0}
@@ -117,6 +117,7 @@ input[type=range]{width:100%; accent-color:var(--accent); min-height:24px; margi
 #framePrev[hidden]{display:none}
 #frameRow[hidden]{display:none}
 #cut{touch-action:none}
+#cutTools.cutbar{padding:8px 12px; gap:6px; margin-top:4px; border-radius:16px; background:var(--chip,#eee)}
 #cutTools{display:flex; flex-direction:column; gap:10px}
 #cutTools[hidden]{display:none}
 .btn[disabled]{opacity:.4; cursor:not-allowed}
@@ -136,6 +137,14 @@ input[type=range]{width:100%; accent-color:var(--accent); min-height:24px; margi
       </div>
     </div>
   </header>
+
+  <div id="cutTools" class="cutbar" hidden>
+    <div class="chips" id="cutMode" aria-label="切りぬき方"></div>
+    <div id="paintBox" hidden>
+      <div class="chips" id="paintTool" aria-label="ブラシと消しゴム"></div>
+      <div class="slider"><label for="brush">太さ</label><input id="brush" type="range" min="6" max="90" step="1" value="30"><span class="ends"><span>ほそい</span><span>ふとい</span></span></div>
+    </div>
+  </div>
 
   <section class="stage" id="stage">
     <canvas id="gl" width="864" height="1080" role="img" aria-label="ぷるぷる揺れる透明なゼリー。つついたり、ひっぱったりできます"></canvas>
@@ -169,13 +178,6 @@ input[type=range]{width:100%; accent-color:var(--accent); min-height:24px; margi
     <div class="pane" id="pane-shape" role="tabpanel">
       <div class="chips" id="shapes"></div>
       <p class="note">背景が透明な画像(透過PNG)は、画像の形のゼリーになります。ふつうの写真は、型に入れて固めます。</p>
-      <div id="cutTools" hidden>
-        <div class="chips" id="cutMode" aria-label="切りぬき方"></div>
-        <div id="paintBox" hidden>
-          <div class="chips" id="paintTool" aria-label="ブラシと消しゴム"></div>
-          <div class="slider"><label for="brush">太さ</label><input id="brush" type="range" min="6" max="90" step="1" value="30"><span class="ends"><span>ほそい</span><span>ふとい</span></span></div>
-        </div>
-      </div>
       <p class="note" id="cutNote">右上の「切りぬく」を押して、残したい部分を指で塗ります。塗り終わったら右上の「できた」を押すと、塗った部分だけがゼリーになります。「ぐるっと囲む」で選ぶこともできます。</p>
     </div>
     <div class="pane" id="pane-color" role="tabpanel" hidden>
@@ -184,6 +186,7 @@ input[type=range]{width:100%; accent-color:var(--accent); min-height:24px; margi
         <div class="tool-actions"><button class="btn small" id="clearTop" type="button">ぜんぶ取る</button></div>
         <p class="note">ゼリーをタップするとのります。</p></div>
       <div class="group"><div class="label">おやつ(中をただよう)</div><div class="chips" id="treatMode"></div></div>
+      <div class="group"><div class="label">泡のはじけ(炭酸のとき)</div><div class="chips" id="popMode"></div></div>
     </div>
     <div class="pane" id="pane-bg" role="tabpanel" hidden>
       <div class="chips" id="bgs"></div>
@@ -286,7 +289,7 @@ const BGS = {
   mint: {label:'みず色',    sw:'#a9d9ee', c1:[0.91,0.97,1.00],   c2:[0.66,0.84,0.95], dark:0},
   black:{label:'くらやみ',  sw:'#17161c', c1:[0.13,0.13,0.16],   c2:[0.015,0.015,0.025], dark:1}
 };
-const S = {treat:'off', cardColor:'choco', title:'ぷるぷるゼリーシール', price:'¥330', frame:'none', brush:30, eraser:false, cutMode:'paint', tool:'touch', shape:'image', color:'auto', bg:'white', sugar:false, fixed:false, tab:'color', bubble:'fizz', hueT:565, hueB:565, dens:0.26, haze:0, soft:0.5,
+const S = {popOn:false, treat:'off', cardColor:'choco', title:'ぷるぷるゼリーシール', price:'¥330', frame:'none', brush:30, eraser:false, cutMode:'paint', tool:'touch', shape:'image', color:'auto', bg:'white', sugar:false, fixed:false, tab:'color', bubble:'fizz', hueT:565, hueB:565, dens:0.26, haze:0, soft:0.5,
            src:null, hasAlpha:true, bbox:null, avg:[1,0.45,0.5], baseV:0.8, topV:0.2, mask:null};
 
 /* ---------- シェーダー ---------- */
@@ -307,6 +310,9 @@ uniform vec3 uT2;        // 下側の光の通りやすさ(色)
 uniform vec3 uB2;        // 下側の明るい色
 uniform vec2 uGrad;      // 上の位置, 1/高さ(上下の色のグラデーション用)
 uniform float uTime;
+uniform vec4 uFxA[12];     // インク・光の粒・泡の弾け (x, y, 大きさ, 進み具合)
+uniform vec4 uFxB[12];     // (種類 1=インク 2=光 3=弾け, 乱数, 濃さ, 0)
+uniform vec4 uFxC[12];     // 色
 uniform vec4 uFz;        // 強炭酸 (有効, 昇った距離, 勢い, 0)
 uniform sampler2D uTr;     // おやつの絵(4×2のタイル)
 uniform vec4 uTrA[6];      // (x, y, 大きさ, 向き)
@@ -595,6 +601,37 @@ void main(){
     }
   }
 
+  // インク(色のしずくが溶けて広がる)・光の粒(ふわっと光って消える)・泡の弾け
+  {
+    float fxm = smoothstep(0.03, 0.12, th);
+    for (int i = 0; i < 12; i++){
+      vec4 f = uFxA[i], g = uFxB[i], c = uFxC[i];
+      if (g.x <= 0.0) continue;
+      vec2 dv = uv - f.xy;
+      float d = length(dv), p = f.w;
+      if (g.x < 1.5){
+        if (d > f.z * 1.9) continue;
+        float an = atan(dv.y, dv.x);
+        float R = f.z * (0.5 + 0.75 * pow(p, 0.5)) * (1.0 + 0.10 * sin(an * 3.0 + g.y * 6.0 + p * 1.5) + 0.05 * sin(an * 5.0 - g.y * 9.0 + p * 2.2));
+        vec2 q = vec2(dv.x, dv.y * 0.8);
+        float k = exp(-pow(length(q) / max(R, 1e-4), 2.0) * 2.4);
+        float lf = smoothstep(0.0, 0.08, p) * (1.0 - smoothstep(0.5, 1.0, p));
+        col = mix(col, c.rgb, clamp(k * lf * g.z * fxm, 0.0, 1.0));
+      } else if (g.x < 2.5){
+        if (d > f.z * 2.6) continue;
+        float gl = exp(-pow(d / f.z, 2.0) * 3.0), core = exp(-pow(d / (f.z * 0.35), 2.0) * 3.0);
+        float lf = sin(3.14159 * p); lf *= lf;
+        bubHL += c.rgb * (gl * 0.7 + core * 1.0) * lf * g.z * fxm;
+      } else {
+        if (d > f.z * 3.4) continue;
+        float R = f.z * (1.0 + 1.3 * p), w = f.z * 0.2;
+        float ring = exp(-pow((d - R) / w, 2.0)) * pow(1.0 - p, 1.5);
+        float fl = exp(-pow(d / (f.z * 0.7), 2.0) * 2.0) * (1.0 - smoothstep(0.0, 0.3, p));
+        bubHL += vec3(1.0) * (ring * 0.85 + fl * 0.6) * g.z * fxm;
+      }
+    }
+  }
+
   // 細かい絵(顔など)の上は、ふちの光を弱めて見えるようにする
   float dl = 0.0;
   {
@@ -675,7 +712,7 @@ gl.linkProgram(prog);
 if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
 gl.useProgram(prog);
 const U = {};
-['uRes','uImg','uGeo','uAux','uDef','uT','uB','uDens','uHaze','uBg1','uBg2','uRip','uPress','uDent','uLift','uHX','uSugar','uBub','uTr','uTrA','uTrB','uGlow','uT2','uB2','uGrad','uTime','uFz','uMaskOut','uBgTex','uBgPhoto','uBgOff','uCast'].forEach(k => U[k] = gl.getUniformLocation(prog, k));
+['uRes','uImg','uGeo','uAux','uDef','uT','uB','uDens','uHaze','uBg1','uBg2','uRip','uPress','uDent','uLift','uHX','uSugar','uBub','uTr','uTrA','uTrB','uGlow','uT2','uB2','uGrad','uTime','uFxA','uFxB','uFxC','uFz','uMaskOut','uBgTex','uBgPhoto','uBgOff','uCast'].forEach(k => U[k] = gl.getUniformLocation(prog, k));
 
 function makeTex(unit){
   const t = gl.createTexture();
@@ -1098,6 +1135,9 @@ function draw(){
   gl.uniform1f(U.uGlow, S.bg === 'black' ? 1 : 0);
   bubArr.fill(0); bubs.forEach((b, i) => { bubArr[i*4] = b.x; bubArr[i*4+1] = b.y; bubArr[i*4+2] = b.r; bubArr[i*4+3] = b.a; });
   gl.uniform4fv(U.uBub, bubArr);
+  fxA.fill(0); fxB.fill(0); fxC.fill(0);
+  fxs.forEach((o, i) => { if (i > 11) return; fxA.set([o.x, o.y, o.sz, o.age/o.life], i*4); fxB.set([o.kind, o.seed, o.al, 0], i*4); fxC.set([o.rgb[0], o.rgb[1], o.rgb[2], 0], i*4); });
+  gl.uniform4fv(U.uFxA, fxA); gl.uniform4fv(U.uFxB, fxB); gl.uniform4fv(U.uFxC, fxC);
   gl.uniform4f(U.uFz, S.bubble === 'strong' ? 1 : 0, fizzPhase, fizzBoost, 0);
   trArr.fill(0); trArrB.fill(0);
   trs.forEach((t, i) => { if (i > 5) return; trArr.set([t.x, t.y, t.sz*t.scale, t.ang], i*4); trArrB.set([t.alpha, t.cell, t.lod, 0], i*4); });
@@ -1115,7 +1155,7 @@ function frame(now){
   for (let i = 0; i < n; i++) stepPhys(dt/n);
   for (let i = ripples.length - 1; i >= 0; i--){ ripples[i].age += dt*(S.fixed ? 1 - 0.5*S.soft : 1); if (ripples[i].age > 3.5) ripples.splice(i, 1); }
   stepTops(dt);
-  stepFizz(dt); stepBubbles(dt); stepTreats(dt);
+  stepFizz(dt); stepBubbles(dt); stepTreats(dt); stepFx(dt);
   draw();
   requestAnimationFrame(frame);
 }
@@ -1162,7 +1202,8 @@ function renderChips(){
     S.shape = k; tops.length = 0; renderChips(); buildGeometry(); drop();
   });
   chipRow($('bubbleMode'), [['off','なし'],['calm','ゆらゆら'],['fizz','炭酸'],['strong','強炭酸']], S.bubble, k => { S.bubble = k; initBubbles(); renderChips(); });
-  chipRow($('treatMode'), [['off','なし'],['bean','ビーンズ'],['berry','いちご']], S.treat, k => { S.treat = k; initTreats(); renderChips(); });
+  chipRow($('popMode'), [['off','なし'],['on','あり']], S.popOn ? 'on' : 'off', k => { S.popOn = k === 'on'; renderChips(); });
+  chipRow($('treatMode'), [['off','なし'],['bean','ビーンズ'],['berry','いちご'],['glow','ひかり']], S.treat, k => { S.treat = k; initTreats(); renderChips(); });
   chipRow($('sugar'), [['off','なし'],['dia','ひし形'],['star','星'],['heart','ハート']], S.sugar || 'off', k => { S.sugar = k === 'off' ? false : k; renderChips(); });
   chipRow($('motion'), [['go','輪郭も動く'],['fix','輪郭は固定(波紋だけ)']], S.fixed ? 'fix' : 'go', k => { S.fixed = k === 'fix'; if (S.fixed) drop(); renderChips(); });
   chipRow($('bgs'), Object.entries(BGS).map(([k,v]) => [k, v.label, v.sw]), S.bg, k => { S.bg = k; renderChips(); });
@@ -2122,10 +2163,43 @@ function pickSpotMid(b, lowerOnly){
   }
   return false;
 }
-function initTreats(){ trs.length = 0; trT = 0.6; }
+const fxs = [], fxA = new Float32Array(48), fxB = new Float32Array(48), fxC = new Float32Array(48);
+let fxT = 0.5;
+function initTreats(){ trs.length = 0; trT = 0.6; fxs.length = 0; fxT = 0.5; }
+function addPop(x, y, r){
+  if (!S.popOn || fxs.filter(o => o.kind === 3).length >= 4) return;
+  fxs.push({kind:3, x, y, sz:Math.max(r, 0.006), age:0, life:0.4, seed:Math.random(), vx:0, vy:0, rgb:[1,1,1], al:0.85});
+}
+function hsv2rgb(h, s, v){ const f = n => { const k = (n + h*6) % 6; return v - v*s*Math.max(0, Math.min(k, 4 - k, 1)); }; return [f(5), f(3), f(1)]; }
+const INKH = [0.93, 0.80, 0.12, 0.45, 0.58];
+const GLOWC = [[1,0.96,0.80],[0.86,0.97,1],[1,0.88,0.95],[0.9,1,0.9]];
+function stepFx(dt){
+  const mode = S.treat;
+  if (!S.mask || !S.dist || (mode !== 'ink' && mode !== 'glow')){ for (let i = fxs.length - 1; i >= 0; i--) if (fxs[i].kind !== 3) fxs.splice(i, 1); }
+  else {
+    fxT -= dt;
+    if (fxT <= 0){
+      const ink = mode === 'ink', cnt = fxs.filter(o => o.kind === (ink ? 1 : 2)).length;
+      fxT = ink ? 2.6 + Math.random()*2.2 : 0.7 + Math.random()*0.9;
+      if (cnt < (ink ? 2 : 6)){
+        const b = {x:0, y:0, r:ink ? 0.09 : 0.03, r0:ink ? 0.09 : 0.03};
+        if (pickSpotMid(b, false)){
+          fxs.push(ink
+            ? {kind:1, x:b.x, y:b.y, sz:0.075 + Math.random()*0.03, age:0, life:7 + Math.random()*2, seed:Math.random(), vx:(Math.random()-0.5)*0.006, vy:0.010, rgb:hsv2rgb(INKH[Math.floor(Math.random()*INKH.length)], 0.5, 1), al:0.85}
+            : {kind:2, x:b.x, y:b.y, sz:0.020 + Math.random()*0.012, age:0, life:4.5 + Math.random()*3, seed:Math.random(), vx:(Math.random()-0.5)*0.012, vy:-0.008 - Math.random()*0.010, rgb:GLOWC[Math.floor(Math.random()*GLOWC.length)], al:0.8});
+        }
+      }
+    }
+  }
+  for (let i = fxs.length - 1; i >= 0; i--){
+    const o = fxs[i];
+    o.age += dt; o.x += (o.vx - ph.accS*0.01)*dt; o.y += (o.vy - ph.accA*0.01)*dt;
+    if (o.age >= o.life){ fxs.splice(i, 1); }
+  }
+}
 // ビーンズ: 下から1粒ずつ、ゆっくり回りながら昇っていく / いちご: ふわっと現れて漂い、ぼやけて消える
 function stepTreats(dt){
-  if (!trReady || S.treat === 'off' || !S.mask || !S.dist){ if (trs.length) trs.length = 0; return; }
+  if (!trReady || S.treat === 'off' || S.treat === 'ink' || S.treat === 'glow' || !S.mask || !S.dist){ if (trs.length) trs.length = 0; return; }
   const bean = S.treat === 'bean', maxN = bean ? 3 : 2, t = performance.now()/1000;
   trT -= dt;
   if (trT <= 0 && trs.length < maxN){
@@ -2190,7 +2264,7 @@ function stepBubbles(dt){
     if (fizz){
       const nx = b.x + (Math.sin(t*3.0 + b.ph)*0.012 + b.vx)*dt, ny = b.y + (-b.rise*rk + b.vy)*dt;
       if (bubOK(nx, ny, b.r)){ b.x = nx; b.y = ny; b.age = Math.min(1, (b.age === undefined ? 1 : b.age) + dt*1.6); }
-      else { b.vx = b.vy = 0; b.age = 0; if (!spawnFizz(b, false)){ b.x = nx; b.y = ny; } }
+      else { if (b.a > 0.02 && ny < b.y && Math.random() < 0.7) addPop(b.x, b.y, b.r); b.vx = b.vy = 0; b.age = 0; if (!spawnFizz(b, false)){ b.x = nx; b.y = ny; } }
       b.a = bubFade(b.x, b.y, b.r) * b.age;
       continue;
     }
